@@ -17,9 +17,14 @@ const Tesseract = require('node-tesseract');
 const path = require('path');
 const url = require('url');
 const cors = require('cors');
+const axios = require('axios');
 // const collection = require('utils');
-const cullinaryMeasures = ["kilogram", "teaspoon", "tablespoon", "g", "tablespoons", "ml", "cup", "cups"];
+const culinaryMeasures = ["kilogram", "teaspoon", "tablespoon", "g", "tablespoons", "ml", "cup", "cups", "litres"];
+const appId = "6df654c0";
+const appKey = "0ee19ddd17a26b8d16a75a48a1dcb1e8";
+const UriEdamamNutrients = `https://api.edamam.com/api/food-database/nutrients?app_id=${appId}&app_key=${appKey}`;
 const utils_1 = require("./utils");
+// import {request} from "https";
 app.use(cors());
 //setup
 const DB_NAME = 'db.json';
@@ -39,7 +44,6 @@ app.get('/recipes/:filename', function (req, res) {
         const col = yield utils_1.loadCollection(COLLECTION_NAME, db);
         let file = col.find({ "filename": req.params.filename });
         let filePath = './' + file[0].destination + '/' + file[0].filename;
-        let lessRawArray = [];
         let arrayOfIngredientObjects = [];
         Tesseract.process(filePath, function (err, text) {
             text = replaceAll(text, /\n(?!\n)/, " ").trim();
@@ -73,7 +77,7 @@ app.get('/recipes/:filename', function (req, res) {
                     }
                 });
             });
-            arrayOfIngredientObjects = trimmedRecipeLines.map((element, index) => {
+            let recipeObjectsArray = trimmedRecipeLines.map((element, index) => {
                 //here you need to take a line and convert it into an object
                 // console.log('element', element);
                 let line = element.split(" ");
@@ -85,7 +89,7 @@ app.get('/recipes/:filename', function (req, res) {
                 for (let i = 0; i < line.length; i++) {
                     let lineItem = line[i];
                     //first we check if the line has any measuring units in it
-                    if (cullinaryMeasures.indexOf(lineItem) > -1) {
+                    if (culinaryMeasures.indexOf(lineItem) > -1) {
                         indexOfMeasure = i;
                         units = lineItem;
                         quantity = line[i - 1];
@@ -97,20 +101,39 @@ app.get('/recipes/:filename', function (req, res) {
                     }
                 }
                 if (indexOfMeasure && quantity) {
-                    ingredient = line.slice(indexOfMeasure + 1).join(" ");
+                    ingredient = line.slice(indexOfMeasure + 1).join("%20");
                 }
                 else if (quantity) {
-                    ingredient = line.slice(indexOfQuantity + 1).join(" ");
+                    ingredient = line.slice(indexOfQuantity + 1).join("%20");
                 }
-                let object = new RecipeLineObject(quantity, units, ingredient);
-                // console.log( 'object', object);
-                return object;
+                else {
+                    ingredient = line.join("%20");
+                }
+                return new RecipeLineObject(quantity, units, ingredient);
+                // const UriEdamamParser = `https://api.edamam.com/api/food-database/parser?ingr=${ingredient}&app_id=${appId}&app_key=${appKey}&page=1`;
+                // console.log("URI PARSER", UriEdamamParser);
+                // let object = axios.get(UriEdamamParser).then(), function (err, data) {
+                //     if (data) {
+                //         // console.log('data hints',data.body);
+                //         // ingredient = data.body.hints.food.uri;
+                //         // data.body.hints[0].measures.forEach(
+                //         //     (x,i)=>{
+                //         //         if (x.label && line.indexOf(x.label.toLowerCase()) >-1) {
+                //         //             units = x.uri;
+                //         //         }});
+                //         return data.body;
+                //         // return new RecipeLineObject(quantity,units,ingredient)
+                //     } else if (err) {
+                //         console.log('err', err);
+                //     } else {
+                //         console.log('some other error',err)
+                //     }
+                //
+                // });
+                // res.json(promiseObjects);
             });
-            sendResponse();
+            res.json(recipeObjectsArray);
         });
-        function sendResponse() {
-            res.json(arrayOfIngredientObjects);
-        }
     });
 });
 app.post('/uploads', upload.single('image'), (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -128,74 +151,134 @@ app.post('/uploads', upload.single('image'), (req, res) => __awaiter(this, void 
 app.listen(3000, () => {
     console.log('app listening on port 3000!');
 });
-let filePath = './' + 'uploads' + '/' + '5b9e2790a6ede8cc3676e91bd7958dd8';
-Tesseract.process(filePath, function (err, text) {
-    text = replaceAll(text, /\n(?!\n)/, " ").trim();
-    let measures = /\(([^)]+)\)/g;
-    let match = measures.exec(text);
-    let matchArray = [];
-    while (match != null) {
-        matchArray.push(match);
-        text = text.replace(match[0], match[1]);
-        match = measures.exec(text);
-    }
-    let rawRecipeLines = text.split(/\n/);
-    let trimmedRecipeLines = [];
-    //this function trims all the alternative measures before quantity of metric measures
-    for (let i = 0; i < rawRecipeLines.length; i++) {
-        let line = rawRecipeLines[i].trim();
-        let newLine = trimNonMetric(line, matchArray) ? trimNonMetric(line, matchArray) : line;
-        trimmedRecipeLines.push(newLine);
-    }
-    // recipes sometimes have multiple ingredients on the same line
-    // ex: 1 teaspoon sugar, 1 tablespoon salt
-    // we need to split this up recursively until there is only one ingredient per line
-    trimmedRecipeLines.forEach((element, index) => {
-        let words = element.split(" ");
-        words.forEach((e, i) => {
-            if (i > 0 && !isNaN(e)) {
-                let subLineOne = words.slice(0, i).join(" ");
-                let subLineTwo = words.slice(i).join(" ");
-                trimmedRecipeLines.splice(index, 1, subLineOne);
-                trimmedRecipeLines.splice(index + 1, 0, subLineTwo);
-            }
-        });
-    });
-    let arrayOfIngredietObjects = trimmedRecipeLines.map((element, index) => {
-        //here you need to take a line and convert it into an object
-        // console.log('element', element);
-        let line = element.split(" ");
-        let quantity = null;
-        let units = null;
-        let ingredient = element;
-        let indexOfMeasure;
-        let indexOfQuantity;
-        for (let i = 0; i < line.length; i++) {
-            let lineItem = line[i];
-            //first we check if the line has any measuring units in it
-            if (cullinaryMeasures.indexOf(lineItem) > -1) {
-                indexOfMeasure = i;
-                units = lineItem;
-                quantity = line[i - 1];
-            }
-            //then we identify the index of quantity
-            if (!isNaN(lineItem)) {
-                quantity = line[i];
-                indexOfQuantity = i;
-            }
-        }
-        if (indexOfMeasure && quantity) {
-            ingredient = line.slice(indexOfMeasure + 1).join(" ");
-        }
-        else if (quantity) {
-            ingredient = line.slice(indexOfQuantity + 1).join(" ");
-        }
-        let object = new RecipeLineObject(quantity, units, ingredient);
-        // console.log( 'object', object);
-        return object;
-    });
-    console.log('array of ingredient objects', arrayOfIngredietObjects);
-});
+/*
+*================================================================================================
+ */
+// let filePath =  './' + 'uploads' + '/' + '5b9e2790a6ede8cc3676e91bd7958dd8';
+//
+//
+// Tesseract.process(filePath, function (err, text) {
+//     text = replaceAll(text,/\n(?!\n)/, " ").trim();
+//     let measures = /\(([^)]+)\)/g;
+//     let match = measures.exec(text);
+//     let matchArray = [];
+//
+//     while (match != null) {
+//         matchArray.push(match);
+//         text = text.replace(match[0], match[1]);
+//         match = measures.exec(text);
+//     }
+//
+//     let rawRecipeLines = text.split(/\n/);
+//     let trimmedRecipeLines = [];
+//
+//     //this function trims all the alternative measures before quantity of metric measures
+//     for (let i=0; i< rawRecipeLines.length; i++) {
+//         let line = rawRecipeLines[i].trim();
+//         let newLine = trimNonMetric(line, matchArray) ? trimNonMetric(line, matchArray) : line;
+//         trimmedRecipeLines.push(newLine);
+//         console.log(trimmedRecipeLines)
+//     }
+//
+//     trimmedRecipeLines.forEach((element,index)=>{
+//         let words = element.split(" ");
+//         words.forEach((e,i) => {
+//             if (i > 0 && !isNaN(e)){
+//                 let subLineOne = words.slice(0,i).join(" ");
+//                 let subLineTwo = words.slice(i).join(" ");
+//                 trimmedRecipeLines.splice(index,1,subLineOne);
+//                 trimmedRecipeLines.splice(index+1,0,subLineTwo);
+//             }
+//         });
+//     });
+//
+//
+//     let arrayOfIngredientObjects = trimmedRecipeLines.map((element,index) => {
+//         //here you need to take a line and convert it into an object
+//         // console.log('element', element);
+//         let line = element.split(" ");
+//         console.log("LINE", line);
+//         let quantity:number = null;
+//         let units:string = null;
+//         let ingredient:string = element;
+//         let indexOfMeasure:number;
+//         let indexOfQuantity:number;
+//
+//         for (let i = 0; i < line.length; i++) {
+//             let lineItem = line[i];
+//             //first we check if the line has any measuring units in it
+//             if (culinaryMeasures.indexOf(lineItem)>-1){
+//                 indexOfMeasure = i;
+//                 units = lineItem;
+//                 quantity = line[i-1];
+//             }
+//             //then we identify the index of quantity
+//             if ( !isNaN(lineItem)) {
+//                 quantity = line[i];
+//                 indexOfQuantity = i;
+//             }
+//         }
+//
+//         if (indexOfMeasure && quantity) {
+//             ingredient = line.slice(indexOfMeasure+1).join("%20");
+//         } else if (quantity) {
+//             ingredient = line.slice(indexOfQuantity+1).join("%20");
+//         } else {
+//             ingredient = line.join("%20");
+//         }
+//
+//
+//         const UriEdamamParser = `https://api.edamam.com/api/food-database/parser?ingr=${ingredient}&app_id=${appId}&app_key=${appKey}&page=0`;
+//
+//
+//         // request(UriEdamamParser, function (err, data) {
+//         //     ingredient = data.body.hints[0].food.uri
+//         //     measure = data.body.hints[0].measures.forEach(
+//         //     (x,i)=>{
+//         //         if (x.label && line.indexOf(x.label.toLowerCase()) >-1) {
+//         //             return x.uri;
+//         //         }})
+//         // })
+//
+//         let object = new RecipeLineObject(quantity,units,ingredient);
+//
+//         return object;
+//
+//     });
+//
+//     console.log('array of ingredient objects', arrayOfIngredientObjects);
+//
+//     // sendEdamameRequest(arrayOfIngredientObjects[0]);
+//
+//
+// });
+//
+// let sampleObject = {
+//         "yield": 1,
+//         "ingredients": [
+//             {
+//                 "quantity": 1,
+//                 "measureURI": "http://www.edamam.com/ontologies/edamam.owl#Measure_unit",
+//                 "foodURI": "http://www.edamam.com/ontologies/edamam.owl#Food_11529"
+//             }
+//         ]
+//     };
+// function sendEdamamIngredientRequest(postData) {
+//     let clientServerOptions = {
+//         uri : UriEdamamNutrients,
+//         body: JSON.stringify(postData),
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json'
+//         }
+//
+//     };
+//
+//     request(clientServerOptions, function (error, response) {
+//         console.log(error,response.body);
+//         return;
+//     });
+// }
 function trimNonMetric(line, matchArray) {
     for (let j = 0; j < matchArray.length; j++) {
         let measure = matchArray[j][1];
@@ -211,8 +294,8 @@ function splitRecipeLine(line) {
     let object;
     let lineItems = line.split(" ");
     for (let j = 0; j < lineItems.length; j++) {
-        let measure = cullinaryMeasures[j];
-        let index = line.indexOf(cullinaryMeasures[j]);
+        let measure = culinaryMeasures[j];
+        let index = line.indexOf(culinaryMeasures[j]);
         if (index > -1) {
             let units = measure;
             let quantity = line.substring(0, index).trimLeft();

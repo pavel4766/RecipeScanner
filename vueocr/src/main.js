@@ -6,6 +6,8 @@ import Vue from 'vue';
 import App from './App';
 import router from './router/index';
 import Vuetify from 'vuetify';
+import VueResource from 'vue-resource'
+Vue.use(VueResource);
 
 Vue.use(Vuetify);
 

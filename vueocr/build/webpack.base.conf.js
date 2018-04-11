@@ -44,7 +44,8 @@ module.exports = {
       {
         test: /\.vue$/,
         loader: 'vue-loader',
-        options: vueLoaderConfig
+        hotReload: false
+          // options: vueLoaderConfig
       },
       {
         test: /\.js$/,

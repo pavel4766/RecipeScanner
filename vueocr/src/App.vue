@@ -7,6 +7,7 @@
 <script>
     import ocr from  "./components/OCR"
 
+
     export default {
         name: 'App',
         components: {
