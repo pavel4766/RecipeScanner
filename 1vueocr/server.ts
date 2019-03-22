@@ -75,21 +75,18 @@ namespace RecipeScanner {
     });
 
     app.post('/nutrition', async (req, res) => {
-        try{
-            let object = req.body;
-            const uriNutritionalAnalysis = `https://api.edamam.com/api/nutrition-data?app_id=${process.env.APP_ID}&app_key=${process.env.APP_KEY}&ingr=${object.quantity}%20${object.units}%20${object.ingredient}`;
-            let result = axios.get(uriNutritionalAnalysis).then((response)=> {
-                    console.log('edamame success',response);
-                    res.send(response.data);
-                }
-            ).catch((err)=> {
-                console.log('edamame error',err);
-            });
-
-        } catch (err) {
-            console.log('caught error',err);
+        let object = req.body;
+        const uriNutritionalAnalysis = `https://api.edamam.com/api/nutrition-data?app_id=${process.env.APP_ID}&app_key=${process.env.APP_KEY}&ingr=${object.quantity}%20${object.units}%20${object.ingredient}`;
+        let result = axios.get(uriNutritionalAnalysis).then((response)=> {
+                console.log('edamame success',response);
+                res.send(response.data);
+            }
+        ).catch((err)=> {
+            console.log('edamame error',err);
             res.sendStatus(500);
-        }
+        });
+
+
     });
 
     const processTesseractData = async function(err, text) {
