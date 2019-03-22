@@ -12,7 +12,6 @@ namespace RecipeScanner {
     app.use(busboy());
     app.use(express.json());
 
-    const router = express.Router();
     const UPLOAD_PATH ='uploads';
     const culinaryMeasures:String[] = ["kilogram", "teaspoon", "tablespoon","g","tablespoons","ml", "cup", "cups", "litres"];
     const appId = "6df654c0";
