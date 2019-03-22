@@ -19,34 +19,16 @@ namespace RecipeScanner {
     const UriEdamamNutrients = `https://api.edamam.com/api/food-database/nutrients?app_id=${appId}&app_key=${appKey}`;
 
 
-// middleware to use for all requests
+    // middleware to use for all requests
     app.use(function(req, res, next) {
         // do logging
-        console.log('Something is happening.');
+        console.log('Something is happening!');
         next(); // make sure we go to the next routes and don't stop here
     });
 
     app.listen(3000);
 
-    // let getEdamameResponse = function (data) {
-    //     debugger;
-    //
-    //     const UriEdamamParser = `https://api.edamam.com/api/food-database/parser?ingr=${ingredient}&app_id=${appId}&app_key=${appKey}&page=1`;
-    //     console.log("URI PARSER", UriEdamamParser);
-    //     let object = axios.get(UriEdamamParser).then(
-    //         function (err, data) {
-    //             if (data) {
-    //                 return data.body;
-    //                 // return new RecipeLineObject(quantity,units,ingredient)
-    //             } else if (err) {
-    //                 console.log('err', err);
-    //             }
-    //         }
-    //     )
-    // };
-
-
-
+    //upload images an return text extracted by the Tesseract OCR engine
     app.post('/uploadimage', async (req, res) => {
         try{
             let fileStream = null;
@@ -74,21 +56,15 @@ namespace RecipeScanner {
     });
 
     app.post('/nutrition', async (req, res) => {
-        try{
-            let object = req.body;
-            const uriNutritionalAnalysis = `https://api.edamam.com/api/nutrition-data?app_id=${process.env.APP_ID}&app_key=${process.env.APP_KEY}&ingr=${object.quantity}%20${object.units}%20${object.ingredient}`;
-            let result = axios.get(uriNutritionalAnalysis).then((response)=> {
-                    console.log('edamame success',response);
-                    res.send(response.data);
-                }
-            ).catch((err)=> {
-                console.log('edamame error',err);
-            });
-
-        } catch (err) {
-            console.log('caught error',err);
-            res.sendStatus(500);
-        }
+        let object = req.body;
+        const uriNutritionalAnalysis = `https://api.edamam.com/api/nutrition-data?app_id=${process.env.APP_ID}&app_key=${process.env.APP_KEY}&ingr=${object.quantity}%20${object.units}%20${object.ingredient}`;
+        let result = axios.get(uriNutritionalAnalysis).then((response)=> {
+                console.log('edamame success',response);
+                res.send(response.data);
+            }
+        ).catch((err)=> {
+            console.log('edamame error',err);
+        });
     });
 
     const processTesseractData = async function(err, text) {
@@ -177,11 +153,17 @@ namespace RecipeScanner {
     }
 
 
-    function RecipeLineObject (quantity, units, ingredient) {
-        this.quantity = quantity;
-        this.units = units;
-        this.ingredient = ingredient.join("%20");
-        this.ingredientString = ingredient.join(" ");
+    class RecipeLineObject{
+        public quantity;
+        public units;
+        public ingredient;
+        public ingredientString;
+        constructor (quantity, units, ingredient) {
+            this.quantity = quantity;
+            this.units = units;
+            this.ingredient = ingredient.join("%20");
+            this.ingredientString = ingredient.join(" ");
+        }
     }
 }
 
